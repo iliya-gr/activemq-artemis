@@ -2198,13 +2198,6 @@ public class QueueImpl extends CriticalComponentImpl implements Queue {
                while (iter.hasNext()) {
                   MessageReference ref = iter.next();
 
-                  if (ref.isPaged() && queueDestroyed) {
-                     // this means the queue is being removed
-                     // hence paged references are just going away through
-                     // page cleanup
-                     continue;
-                  }
-
                   if (filter1 == null || filter1.match(ref.getMessage())) {
                      if (messageAction.actMessage(tx, ref)) {
                         iter.remove();
@@ -2241,7 +2234,7 @@ public class QueueImpl extends CriticalComponentImpl implements Queue {
             }
          }
 
-         if (pageIterator != null && !queueDestroyed) {
+         if (pageIterator != null) {
             while (pageIterator.hasNext()) {
                PagedReference reference = pageIterator.next();
                pageIterator.remove();

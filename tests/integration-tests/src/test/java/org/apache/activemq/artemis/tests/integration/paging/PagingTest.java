@@ -1484,6 +1484,44 @@ public class PagingTest extends ActiveMQTestBase {
       Wait.assertEquals(0, ()->server.getPagingManager().getTransactions().size());
    }
 
+   @Test
+   public void testDeleteQueue() throws Exception {
+      clearDataRecreateServerDirs();
+
+      Configuration config = createDefaultNettyConfig().setJournalSyncNonTransactional(false);
+
+      server = createServer(true, config, PagingTest.PAGE_SIZE, PagingTest.PAGE_MAX);
+
+      server.start();
+
+      SimpleString queue = new SimpleString("testPurge:" + RandomUtil.randomString());
+      server.addAddressInfo(new AddressInfo(queue, RoutingType.ANYCAST));
+      QueueImpl purgeQueue = (QueueImpl) server.createQueue(new QueueConfiguration(queue).setRoutingType(RoutingType.ANYCAST).setMaxConsumers(1).setPurgeOnNoConsumers(false).setAutoCreateAddress(false));
+
+      ActiveMQConnectionFactory cf = new ActiveMQConnectionFactory();
+      Connection connection = cf.createConnection();
+      Session session = connection.createSession(true, Session.SESSION_TRANSACTED);
+      javax.jms.Queue jmsQueue = session.createQueue(queue.toString());
+
+      purgeQueue.getPageSubscription().getPagingStore().startPaging();
+
+      MessageProducer producer = session.createProducer(jmsQueue);
+
+      for (int i = 0; i < 100; i++) {
+         producer.send(session.createTextMessage("hello" + i));
+         session.commit();
+      }
+
+      Wait.assertEquals(100, purgeQueue::getMessageCount);
+
+      purgeQueue.deleteQueue(false);
+
+      server.stop();
+      server.start();
+
+      Wait.assertEquals(0, ()->server.getPagingManager().getTransactions().size(), 1000);
+   }
+
    // First page is complete but it wasn't deleted
    @Test
    public void testFirstPageCompleteNotDeleted() throws Exception {
